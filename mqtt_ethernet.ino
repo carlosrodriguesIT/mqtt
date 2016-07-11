@@ -12,8 +12,8 @@
 /************************* Adafruit.io Setup *********************************/
 #define AIO_SERVER      "io.adafruit.com"
 #define AIO_SERVERPORT  1883
-#define AIO_USERNAME    "carlosrodriguesit"
-#define AIO_KEY         "4db0020c64894a6fa2f81c87fbe89d08"					   
+#define AIO_USERNAME    "#########AIOUSERNAME##########"
+#define AIO_KEY         "############AOIKEY############"					   
 /*****************************************************************************/
 
 /************************Variables analog or digital *************************/
