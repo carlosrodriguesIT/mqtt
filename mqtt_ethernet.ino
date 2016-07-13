@@ -12,8 +12,8 @@
 /************************* Adafruit.io Setup *********************************/
 #define AIO_SERVER      "io.adafruit.com"
 #define AIO_SERVERPORT  1883
-#define AIO_USERNAME    "#########AIOUSERNAME##########"
-#define AIO_KEY         "############AOIKEY############"					   
+#define AIO_USERNAME    "carlosrodriguesit"
+#define AIO_KEY         "4db0020c64894a6fa2f81c87fbe89d08"					   
 /*****************************************************************************/
 
 /************************Variables analog or digital *************************/
@@ -33,6 +33,10 @@ IPAddress gatIP(192, 168, 0, 1);
 //Uncomment the following, and set to your preference if you don't have automatic dns.
 IPAddress dnsIP (8, 8, 8, 8);
 //If you uncommented either of the above lines, make sure to change "Ethernet.begin(mac)" to "Ethernet.begin(mac, iotIP)" or "Ethernet.begin(mac, iotIP, dnsIP)"
+/*****************************************************************************/
+
+/************************* Ethernet Server HTTP 80 *****************************/
+EthernetServer server(80);
 /*****************************************************************************/
 
 /************ Global State (you don't need to change this!) ******************/
@@ -60,7 +64,7 @@ Adafruit_MQTT_Client mqtt(&client, MQTT_SERVER, AIO_SERVERPORT, MQTT_CLIENTID, M
 // Setup a feed called 'temperature' for publishing.
 // Notice MQTT paths for AIO follow the form: <username>/feeds/<feedname>
 const char TEMPERATURE_FEED[] PROGMEM = AIO_USERNAME "/feeds/temperature";
-Adafruit_MQTT_Publish temperature = Adafruit_MQTT_Publish(&mqtt, TEMPERATURE_FEED);
+Adafruit_MQTT_Publish temperature = Adafruit_MQTT_Publish(&mqtt, TEMPERATURE_FEED, MQTT_QOS_1);
 /*****************************************************************************/
 
 /*************************** Sketch Code ************************************/
@@ -79,13 +83,13 @@ uint32_t x=0;
 
 void loop()
 {
-    // Ensure the connection to the MQTT server is alive (this will make the first
-    // connection and automatically reconnect when disconnected).  See the MQTT_connect
-    // function definition further below.
+    //Ensure the connection to the MQTT server is alive (this will make the first
+    //connection and automatically reconnect when disconnected).  See the MQTT_connect
+    //function definition further below.
     MQTT_connect();
 
 
-    // Now we can publish stuff!
+    //Now we can publish stuff!
     Serial.print(-temp.getTemp());
   
     if (! temperature.publish(-temp.getTemp()))
@@ -97,8 +101,13 @@ void loop()
         Serial.println(F("OK!"));
     }
 
+    //function to call Google Chart
+    googleChart();
+    
     //Tempo de espera até nova leitura de temperatura
     delay(5000);
+
+
     
   /*ESTA FUNCAO DESLIGA O SERVIDOR - NAO UTILIZAR
     // ping the server to keep the mqtt connection alive
@@ -187,4 +196,87 @@ void tcpIP()
 	lcd.print(-temp.getTemp());
 }
 /*****************************************************************************/
-	
+
+//function to Start WebServer and display results of analog value with Google Charts 
+void googleChart()
+{
+   // listen for incoming clients
+   EthernetClient client = server.available();
+   
+   if(client)
+   {
+       Serial.println("new client");
+       // an http request ends with a blank line
+       boolean currentLineIsBlank = true;
+       
+       while (client.connected())
+       {
+           if (client.available())
+           {
+               char c = client.read();
+               Serial.write(c);
+             
+               // if you've gotten to the end of the line (received a newline
+              // character) and the line is blank, the http request has ended,
+             // so you can send a reply
+             
+             if (c == '\n' && currentLineIsBlank)
+             {
+                 // send a standard http response header
+                 client.println("HTTP/1.1 200 OK");
+                 client.println("Content-Type: text/html");
+                 client.println("Connection: close");  // the connection will be closed after completion of the response
+                 client.println("Refresh: 5");  // refresh the page automatically every 5 sec
+                 client.println();
+                 client.println("<!DOCTYPE HTML>");
+                 client.println("<html>");
+                 client.println("<head>");
+                 client.println("<script type='text/javascript' src='https://www.gstatic.com/charts/loader.js'></script>");
+                 client.println("<script type='text/javascript'>");
+                 client.println("google.charts.load('current', {'packages':['corechart']});");
+                 client.println("google.charts.setOnLoadCallback(drawChart);");
+                 client.println("function drawChart() {");
+                 client.println("var data = google.visualization.arrayToDataTable([");
+                 client.println("['Effort', 'Amount given'],");
+                 client.println("['Temperature',");
+                 client.print(-temp.getTemp());
+                 client.print("],");
+                 client.println("]);");
+                 client.println("var options = {");
+                 client.println("pieHole: 0.5,");
+                 client.println("pieSliceTextStyle: {");
+                 client.println("color: 'black',");
+                 client.println("},");
+                 client.println("legend: 'Internet of Things'");
+                 client.println("};");
+                 client.println("var chart = new google.visualization.PieChart(document.getElementById('donut_single'));");
+                 client.println("chart.draw(data, options);");
+                 client.println("}");
+                 client.println("</script>");
+                 client.println("</head>");
+                 client.println("<body>");
+                 client.println("<div id='donut_single' style='width: 900px; height: 500px; display: block; margin: 0 auto;'></div>");
+                 client.println("</body>");         
+                 client.println("</html>");
+                break;
+            }
+        
+            if (c == '\n')
+            {
+                // you're starting a new line
+                currentLineIsBlank = true;
+            }
+            else if (c != '\r')
+            {
+                // you've gotten a character on the current line
+                currentLineIsBlank = false;
+            }
+         }
+      }      
+      // give the web browser time to receive the data
+      delay(1);
+      // close the connection:
+      client.stop();
+      Serial.println("client disconnected");
+   }
+}
